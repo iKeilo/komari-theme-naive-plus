@@ -4,20 +4,20 @@ import { computed, h, inject, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import LoginDialog from './LoginDialog.vue'
+import PersonalizationDrawer from './PersonalizationDrawer.vue'
 
 const router = useRouter()
 const appStore = useAppStore()
 
-// 从 Provider 注入滚动状态
 const isScrolled = inject<ReturnType<typeof ref<boolean>>>('isScrolled', ref(false))
-
 const siteFavicon = ref('/favicon.ico')
+const showPersonalizationDrawer = ref(false)
 
-// 计算页面容器的样式
 const containerStyle = computed(() => {
   if (appStore.fullWidth) {
     return {}
   }
+
   return {
     maxWidth: appStore.maxPageWidth,
     marginInline: 'auto',
@@ -31,16 +31,24 @@ const actionButtons = computed(() => {
       icon: appStore.themeMode === 'auto' ? 'i-icon-park-outline-dark-mode' : appStore.themeMode === 'light' ? 'i-icon-park-outline-sun-one' : 'i-icon-park-outline-moon',
       action: 'toggleTheme',
       disabled: false,
+      label: '',
     },
   ]
 
-  // 已登录时显示设置按钮，未登录时根据配置决定是否显示登录按钮
   if (appStore.isLoggedIn) {
+    buttons.push({
+      title: '个性化设置',
+      icon: 'i-icon-park-outline-setting',
+      action: 'openPersonalizationDrawer',
+      disabled: false,
+      label: '主题',
+    })
     buttons.push({
       title: '后台管理',
       icon: 'i-icon-park-outline-setting',
       action: 'jumpToSetting',
       disabled: false,
+      label: '',
     })
   }
   else if (appStore.showLoginButton) {
@@ -49,6 +57,7 @@ const actionButtons = computed(() => {
       icon: 'i-icon-park-outline-login',
       action: 'openLoginDialog',
       disabled: false,
+      label: '',
     })
   }
 
@@ -60,8 +69,10 @@ function handleButtonClick(action: string) {
     case 'toggleTheme':
       appStore.updateThemeMode()
       break
+    case 'openPersonalizationDrawer':
+      showPersonalizationDrawer.value = true
+      break
     case 'jumpToSetting':
-      // 设置页由 Server 提供，不能使用无极路由
       location.href = '/admin'
       break
     case 'openLoginDialog':
@@ -88,8 +99,16 @@ function handleButtonClick(action: string) {
       <NFlex class="flex gap-4">
         <NPopover v-for="button in actionButtons" :key="button.action" :disabled="button.disabled">
           <template #trigger>
-            <NButton :disabled="button.disabled" class="p-2 h-8 w-8" text @click="handleButtonClick(button.action)">
+            <NButton
+              :disabled="button.disabled"
+              :class="button.label ? 'px-3 h-8 rounded-full flex items-center' : 'p-2 h-8 w-8'"
+              text
+              @click="handleButtonClick(button.action)"
+            >
               <div :class="button.icon" />
+              <span v-if="button.label" class="ml-1 text-xs font-medium">
+                {{ button.label }}
+              </span>
             </NButton>
           </template>
           <template #default>
@@ -99,4 +118,5 @@ function handleButtonClick(action: string) {
       </NFlex>
     </div>
   </div>
+  <PersonalizationDrawer v-model:show="showPersonalizationDrawer" />
 </template>

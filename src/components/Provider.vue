@@ -21,19 +21,14 @@ import {
   useNotification,
   zhCN,
 } from 'naive-ui'
-
 import { computed, defineComponent, h, provide, ref, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
-
-// 滚动状态：是否显示返回顶部按钮（即页面已滚动）
 const isScrolled = ref(false)
 
-// 提供给子组件使用
 provide('isScrolled', isScrolled)
 
-// 直接使用 store 中的 isDark computed
 const isDark = computed(() => appStore.isDark)
 
 const theme = computed<GlobalTheme | null>(() => {
@@ -73,26 +68,21 @@ const NaiveProviderContent = defineComponent({
   },
 })
 
-// 从主题配置读取设置，支持亮色/暗色模式分别配置
 const themeOverride = computed<GlobalThemeOverrides>(() => {
   const settings = appStore.publicSettings?.theme_settings as Record<string, unknown> | undefined
+  const primaryColor = isDark.value ? appStore.uiDarkPrimaryColor : appStore.uiLightPrimaryColor
 
-  // 通用默认值
-  const borderRadius = (settings?.borderRadius as string) || '3px'
-  const fontFamily = (settings?.fontFamily as string) || '"MiSans VF", sans-serif'
+  const primaryColorHover = appStore.personalizationActive
+    ? primaryColor
+    : isDark.value
+        ? (settings?.darkPrimaryColorHover as string) || '#7fe7c4'
+        : (settings?.lightPrimaryColorHover as string) || '#36ad6a'
 
-  // 根据当前主题模式选择颜色配置
-  const primaryColor = isDark.value
-    ? (settings?.darkPrimaryColor as string) || '#63e2b6'
-    : (settings?.lightPrimaryColor as string) || '#18a058'
-
-  const primaryColorHover = isDark.value
-    ? (settings?.darkPrimaryColorHover as string) || '#7fe7c4'
-    : (settings?.lightPrimaryColorHover as string) || '#36ad6a'
-
-  const primaryColorPressed = isDark.value
-    ? (settings?.darkPrimaryColorPressed as string) || '#5acea7'
-    : (settings?.lightPrimaryColorPressed as string) || '#0c7a43'
+  const primaryColorPressed = appStore.personalizationActive
+    ? primaryColor
+    : isDark.value
+        ? (settings?.darkPrimaryColorPressed as string) || '#5acea7'
+        : (settings?.lightPrimaryColorPressed as string) || '#0c7a43'
 
   return {
     common: {
@@ -100,17 +90,48 @@ const themeOverride = computed<GlobalThemeOverrides>(() => {
       primaryColorHover,
       primaryColorPressed,
       primaryColorSuppl: primaryColorHover,
-      borderRadius,
-      fontFamily,
+      borderRadius: appStore.uiBorderRadius,
+      fontFamily: appStore.uiFontFamily,
     },
   }
 })
 
-// 将主题颜色同步到 CSS 变量，供 UnoCSS 和自定义样式使用
+const currentCardBackground = computed(() => {
+  return isDark.value ? appStore.uiDarkCardBackground : appStore.uiLightCardBackground
+})
+
+const hasSurfaceCustomization = computed(() => {
+  const cardBackground = currentCardBackground.value.trim().toLowerCase()
+  return cardBackground !== '' && cardBackground !== 'transparent'
+})
+
+const customCssText = computed(() => appStore.uiCustomCss.trim())
+
 watch(
-  themeOverride,
-  (overrides) => {
+  [
+    themeOverride,
+    isDark,
+    () => appStore.personalizationActive,
+    () => appStore.uiCardOpacity,
+    currentCardBackground,
+    () => appStore.uiSurfaceBlur,
+    () => appStore.uiFontFamily,
+  ],
+  ([overrides, dark, personalized, cardOpacity, cardBackground, surfaceBlur, fontFamily]) => {
     const root = document.documentElement
+    const alpha = Math.min(Math.max(cardOpacity / 100, 0.45), 1)
+    const surfaceBackground = cardBackground.toLowerCase() === 'transparent'
+      ? 'transparent'
+      : cardBackground
+    const surfaceBorder = dark
+      ? 'rgba(255, 255, 255, 0.08)'
+      : 'rgba(15, 23, 42, 0.08)'
+    const surfaceShadow = hasSurfaceCustomization.value
+      ? '0 20px 45px rgba(0, 0, 0, 0.35)'
+      : dark
+          ? '0 20px 45px rgba(0, 0, 0, 0.35)'
+          : '0 20px 45px rgba(15, 23, 42, 0.12)'
+
     if (overrides.common?.primaryColor) {
       root.style.setProperty('--primary-color', overrides.common.primaryColor)
     }
@@ -120,40 +141,33 @@ watch(
     if (overrides.common?.primaryColorPressed) {
       root.style.setProperty('--primary-color-pressed', overrides.common.primaryColorPressed)
     }
+
+    root.style.setProperty('--app-surface-background', surfaceBackground)
+    root.style.setProperty('--app-surface-border', surfaceBorder)
+    root.style.setProperty('--app-surface-shadow', hasSurfaceCustomization.value ? surfaceShadow : 'none')
+    root.style.setProperty('--app-surface-blur', personalized && hasSurfaceCustomization.value ? `${surfaceBlur}px` : '0px')
+    root.style.setProperty('--app-surface-opacity', `${alpha}`)
+    root.style.setProperty('--app-font-family', fontFamily)
+
+    root.classList.toggle('dark', dark)
+    root.classList.toggle('personalized-ui', personalized)
+    root.classList.toggle('surface-customized', personalized && hasSurfaceCustomization.value)
   },
   { immediate: true },
 )
 
-// 同步暗色模式到 html.dark 类，供 CSS 选择器使用
-watch(
-  isDark,
-  (dark) => {
-    const root = document.documentElement
-    if (dark) {
-      root.classList.add('dark')
-    }
-    else {
-      root.classList.remove('dark')
-    }
-  },
-  { immediate: true },
-)
-
-// 当启用自定义背景时，设置 body 背景透明
 watch(
   [() => appStore.backgroundEnabled, isDark],
   ([enabled, dark]) => {
     const body = document.body
+
     if (enabled) {
-      // 使用 cssText 覆盖所有背景样式
       body.style.setProperty('background-color', 'transparent', 'important')
+      return
     }
-    else {
-      // 恢复默认背景
-      body.style.removeProperty('background-color')
-      // 设置正确的背景色
-      body.style.backgroundColor = dark ? 'rgb(16, 16, 20)' : '#fff'
-    }
+
+    body.style.removeProperty('background-color')
+    body.style.backgroundColor = dark ? 'rgb(16, 16, 20)' : '#fff'
   },
   { immediate: true },
 )
@@ -169,6 +183,9 @@ watch(
           <NMessageProvider>
             <NModalProvider>
               <slot />
+              <component :is="'style'" v-if="customCssText">
+                {{ customCssText }}
+              </component>
               <NaiveProviderContent />
             </NModalProvider>
           </NMessageProvider>
@@ -177,3 +194,38 @@ watch(
     </NLoadingBarProvider>
   </NConfigProvider>
 </template>
+
+<style>
+:root {
+  --app-surface-background: transparent;
+  --app-surface-border: rgba(15, 23, 42, 0.08);
+  --app-surface-shadow: none;
+  --app-surface-blur: 0px;
+  --app-surface-opacity: 1;
+  --app-font-family: "MiSans VF", sans-serif;
+}
+
+html.personalized-ui body {
+  font-family: var(--app-font-family);
+}
+
+html.personalized-ui.surface-customized .n-card,
+html.personalized-ui.surface-customized .n-alert,
+html.personalized-ui.surface-customized .n-base-selection,
+html.personalized-ui.surface-customized .n-drawer,
+html.personalized-ui.surface-customized .n-modal,
+html.personalized-ui.surface-customized .n-popover {
+  backdrop-filter: blur(var(--app-surface-blur));
+  box-shadow: var(--app-surface-shadow);
+}
+
+html.personalized-ui.surface-customized .n-card,
+html.personalized-ui.surface-customized .n-alert,
+html.personalized-ui.surface-customized .n-base-selection,
+html.personalized-ui.surface-customized .n-drawer,
+html.personalized-ui.surface-customized .n-modal,
+html.personalized-ui.surface-customized .n-popover {
+  background: color-mix(in srgb, var(--app-surface-background) calc(var(--app-surface-opacity) * 100%), transparent) !important;
+  border-color: var(--app-surface-border) !important;
+}
+</style>

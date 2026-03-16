@@ -9,6 +9,26 @@ type Lang = 'zh-CN' | 'en-US'
 type NodeViewMode = 'card' | 'list'
 type RpcTransportMode = 'websocket' | 'http'
 type AlertType = 'default' | 'info' | 'success' | 'warning' | 'error'
+type BackgroundType = 'image' | 'video'
+
+interface UserPersonalization {
+  enabled: boolean
+  backgroundEnabled: boolean
+  backgroundType: BackgroundType
+  lightBackgroundUrl: string
+  darkBackgroundUrl: string
+  backgroundBlur: number
+  backgroundOverlay: number
+  lightPrimaryColor: string
+  darkPrimaryColor: string
+  borderRadius: number
+  lightCardBackground: string
+  darkCardBackground: string
+  cardOpacity: number
+  surfaceBlur: number
+  fontFamily: string
+  customCss: string
+}
 
 /** 默认的 List 视图列配置 */
 const DEFAULT_LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic'] as const
@@ -37,6 +57,63 @@ const DEFAULT_BYTE_DECIMALS: ByteDecimalsConfig = {
   TB: 2,
 }
 
+const PERSONALIZATION_STORAGE_PREFIX = 'userPersonalization:'
+const DEFAULT_USER_PERSONALIZATION: UserPersonalization = {
+  enabled: false,
+  backgroundEnabled: false,
+  backgroundType: 'image',
+  lightBackgroundUrl: '',
+  darkBackgroundUrl: '',
+  backgroundBlur: 0,
+  backgroundOverlay: 0,
+  lightPrimaryColor: '#18a058',
+  darkPrimaryColor: '#63e2b6',
+  borderRadius: 12,
+  lightCardBackground: 'transparent',
+  darkCardBackground: 'transparent',
+  cardOpacity: 100,
+  surfaceBlur: 0,
+  fontFamily: '"MiSans VF", sans-serif',
+  customCss: '',
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function isColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#([0-9a-f]{6}|[0-9a-f]{8})$/i.test(value.trim())
+}
+
+function sanitizeText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value.trim() : fallback
+}
+
+function sanitizePersonalization(value: unknown): UserPersonalization {
+  const raw = typeof value === 'object' && value !== null
+    ? value as Partial<UserPersonalization>
+    : {}
+
+  return {
+    enabled: Boolean(raw.enabled),
+    backgroundEnabled: Boolean(raw.backgroundEnabled),
+    backgroundType: raw.backgroundType === 'video' ? 'video' : 'image',
+    lightBackgroundUrl: sanitizeText(raw.lightBackgroundUrl),
+    darkBackgroundUrl: sanitizeText(raw.darkBackgroundUrl),
+    backgroundBlur: clamp(typeof raw.backgroundBlur === 'number' ? raw.backgroundBlur : 0, 0, 40),
+    backgroundOverlay: clamp(typeof raw.backgroundOverlay === 'number' ? raw.backgroundOverlay : 0, 0, 100),
+    lightPrimaryColor: isColor(raw.lightPrimaryColor) ? raw.lightPrimaryColor : DEFAULT_USER_PERSONALIZATION.lightPrimaryColor,
+    darkPrimaryColor: isColor(raw.darkPrimaryColor) ? raw.darkPrimaryColor : DEFAULT_USER_PERSONALIZATION.darkPrimaryColor,
+    borderRadius: clamp(typeof raw.borderRadius === 'number' ? raw.borderRadius : DEFAULT_USER_PERSONALIZATION.borderRadius, 0, 32),
+    lightCardBackground: sanitizeText(raw.lightCardBackground, DEFAULT_USER_PERSONALIZATION.lightCardBackground) || DEFAULT_USER_PERSONALIZATION.lightCardBackground,
+    darkCardBackground: sanitizeText(raw.darkCardBackground, DEFAULT_USER_PERSONALIZATION.darkCardBackground) || DEFAULT_USER_PERSONALIZATION.darkCardBackground,
+    cardOpacity: clamp(typeof raw.cardOpacity === 'number' ? raw.cardOpacity : DEFAULT_USER_PERSONALIZATION.cardOpacity, 45, 100),
+    surfaceBlur: clamp(typeof raw.surfaceBlur === 'number' ? raw.surfaceBlur : DEFAULT_USER_PERSONALIZATION.surfaceBlur, 0, 32),
+    fontFamily: sanitizeText(raw.fontFamily, DEFAULT_USER_PERSONALIZATION.fontFamily) || DEFAULT_USER_PERSONALIZATION.fontFamily,
+    customCss: typeof raw.customCss === 'string' ? raw.customCss : DEFAULT_USER_PERSONALIZATION.customCss,
+  }
+}
+
 const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(true)
 
@@ -49,6 +126,20 @@ const useAppStore = defineStore('app', () => {
   const isLoggedIn = ref<boolean>(false)
   const connectionError = ref<boolean>(false)
   const requireLogin = ref<boolean>(false)
+  const personalization = ref<UserPersonalization>({ ...DEFAULT_USER_PERSONALIZATION })
+  const personalizationStorageKey = computed(() => {
+    const identity = userInfo.value?.uuid || userInfo.value?.username
+    return identity ? `${PERSONALIZATION_STORAGE_PREFIX}${identity}` : ''
+  })
+
+  const personalizationActive = computed(() => isLoggedIn.value && personalization.value.enabled)
+
+  const publicThemeSettings = computed<Record<string, unknown> | null>(() => {
+    const settings = publicSettings.value?.theme_settings
+    return settings && typeof settings === 'object'
+      ? settings as Record<string, unknown>
+      : null
+  })
 
   // 首页滚动位置记忆
   const homeScrollPosition = ref<number>(0)
@@ -493,15 +584,23 @@ const useAppStore = defineStore('app', () => {
 
   // 计算属性：自定义背景配置
   const backgroundEnabled = computed<boolean>(() => {
-    const settings = publicSettings.value?.theme_settings
+    if (personalizationActive.value) {
+      return personalization.value.backgroundEnabled
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.backgroundEnabled === 'boolean') {
       return settings.backgroundEnabled
     }
     return false
   })
 
-  const backgroundType = computed<'image' | 'video'>(() => {
-    const settings = publicSettings.value?.theme_settings
+  const backgroundType = computed<BackgroundType>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.backgroundType
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.backgroundType === 'string') {
       const type = settings.backgroundType
       if (type === 'image' || type === 'video') {
@@ -512,7 +611,11 @@ const useAppStore = defineStore('app', () => {
   })
 
   const lightBackgroundUrl = computed<string>(() => {
-    const settings = publicSettings.value?.theme_settings
+    if (personalizationActive.value) {
+      return personalization.value.lightBackgroundUrl
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.lightBackgroundUrl === 'string') {
       return settings.lightBackgroundUrl.trim()
     }
@@ -520,7 +623,11 @@ const useAppStore = defineStore('app', () => {
   })
 
   const darkBackgroundUrl = computed<string>(() => {
-    const settings = publicSettings.value?.theme_settings
+    if (personalizationActive.value) {
+      return personalization.value.darkBackgroundUrl
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.darkBackgroundUrl === 'string') {
       return settings.darkBackgroundUrl.trim()
     }
@@ -528,7 +635,11 @@ const useAppStore = defineStore('app', () => {
   })
 
   const backgroundBlur = computed<number>(() => {
-    const settings = publicSettings.value?.theme_settings
+    if (personalizationActive.value) {
+      return personalization.value.backgroundBlur
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.backgroundBlur === 'number' && settings.backgroundBlur >= 0) {
       return settings.backgroundBlur
     }
@@ -536,7 +647,11 @@ const useAppStore = defineStore('app', () => {
   })
 
   const backgroundOverlay = computed<number>(() => {
-    const settings = publicSettings.value?.theme_settings
+    if (personalizationActive.value) {
+      return personalization.value.backgroundOverlay
+    }
+
+    const settings = publicThemeSettings.value
     if (settings && typeof settings.backgroundOverlay === 'number' && settings.backgroundOverlay >= 0 && settings.backgroundOverlay <= 100) {
       return settings.backgroundOverlay
     }
@@ -561,6 +676,35 @@ const useAppStore = defineStore('app', () => {
   }, { immediate: true })
 
   // 使用 VueUse 的 usePreferredDark 检测系统主题偏好
+  function loadPersonalization() {
+    if (!personalizationStorageKey.value) {
+      personalization.value = { ...DEFAULT_USER_PERSONALIZATION }
+      return
+    }
+
+    try {
+      const saved = localStorage.getItem(personalizationStorageKey.value)
+      personalization.value = saved
+        ? sanitizePersonalization(JSON.parse(saved))
+        : { ...DEFAULT_USER_PERSONALIZATION }
+    }
+    catch {
+      personalization.value = { ...DEFAULT_USER_PERSONALIZATION }
+    }
+  }
+
+  watch(personalizationStorageKey, () => {
+    loadPersonalization()
+  }, { immediate: true })
+
+  watch(personalization, (value) => {
+    if (!personalizationStorageKey.value) {
+      return
+    }
+
+    localStorage.setItem(personalizationStorageKey.value, JSON.stringify(sanitizePersonalization(value)))
+  }, { deep: true })
+
   const prefersDark = usePreferredDark()
 
   // 计算当前是否为暗色模式
@@ -578,6 +722,84 @@ const useAppStore = defineStore('app', () => {
     }
     return lightBackgroundUrl.value
   })
+
+  const uiLightPrimaryColor = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.lightPrimaryColor
+    }
+    const value = publicThemeSettings.value?.lightPrimaryColor
+    return typeof value === 'string' && value.trim() ? value.trim() : '#18a058'
+  })
+
+  const uiDarkPrimaryColor = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.darkPrimaryColor
+    }
+    const value = publicThemeSettings.value?.darkPrimaryColor
+    return typeof value === 'string' && value.trim() ? value.trim() : '#63e2b6'
+  })
+
+  const uiBorderRadius = computed<string>(() => {
+    if (personalizationActive.value) {
+      return `${personalization.value.borderRadius}px`
+    }
+    const value = publicThemeSettings.value?.borderRadius
+    return typeof value === 'string' && value.trim() ? value.trim() : '3px'
+  })
+
+  const uiFontFamily = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.fontFamily
+    }
+    const value = publicThemeSettings.value?.fontFamily
+    return typeof value === 'string' && value.trim() ? value.trim() : '"MiSans VF", sans-serif'
+  })
+
+  const uiCardOpacity = computed<number>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.cardOpacity
+    }
+    return 100
+  })
+
+  const uiLightCardBackground = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.lightCardBackground
+    }
+    return 'transparent'
+  })
+
+  const uiDarkCardBackground = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.darkCardBackground
+    }
+    return 'transparent'
+  })
+
+  const uiSurfaceBlur = computed<number>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.surfaceBlur
+    }
+    return 0
+  })
+
+  const uiCustomCss = computed<string>(() => {
+    if (personalizationActive.value) {
+      return personalization.value.customCss
+    }
+    return ''
+  })
+
+  function updatePersonalization(patch: Partial<UserPersonalization>) {
+    personalization.value = sanitizePersonalization({
+      ...personalization.value,
+      ...patch,
+    })
+  }
+
+  function resetPersonalization() {
+    personalization.value = { ...DEFAULT_USER_PERSONALIZATION }
+  }
 
   function updateThemeMode(mode?: ThemeMode) {
     if (mode) {
@@ -656,6 +878,17 @@ const useAppStore = defineStore('app', () => {
     backgroundBlur,
     backgroundOverlay,
     cardBlurRadius,
+    personalization,
+    personalizationActive,
+    uiLightPrimaryColor,
+    uiDarkPrimaryColor,
+    uiBorderRadius,
+    uiFontFamily,
+    uiCardOpacity,
+    uiLightCardBackground,
+    uiDarkCardBackground,
+    uiSurfaceBlur,
+    uiCustomCss,
     isLoggedIn,
     userInfo,
     publicSettings,
@@ -664,6 +897,8 @@ const useAppStore = defineStore('app', () => {
     homeScrollPosition,
     updateThemeMode,
     updateLang,
+    updatePersonalization,
+    resetPersonalization,
     setUserInfo,
     clearUserInfo,
   }

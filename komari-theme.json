@@ -1,9 +1,9 @@
 {
-  "name": "Komari Naive",
-  "short": "Naive",
-  "description": "A naive-ui theme for Komari",
-  "version": "1.1.0",
-  "author": "lyimoexiao",
+  "name": "komari-theme-naive+",
+  "short": "Naive_plus",
+  "description": "A customizable naive-ui theme for Komari",
+  "version": "0.0.1",
+  "author": "iKeilo",
   "url": "https://github.com/lyimoexiao/komari-theme-naive",
   "preview": "preview.png",
   "configuration": {

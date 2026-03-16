@@ -74,7 +74,7 @@ const blurClass = computed(() => {
         <!-- Komari Monitor 信息 -->
         <div class="flex flex-wrap gap-1 items-center">
           <NText :depth="3" class="text-sm">
-            Powered by
+            由
           </NText>
           <a
             href="https://github.com/komari-monitor/komari"
@@ -94,7 +94,7 @@ const blurClass = computed(() => {
         <!-- 主题信息 -->
         <div class="flex flex-wrap gap-1 items-center">
           <NText :depth="3" class="text-sm">
-            Theme by
+            主题
           </NText>
           <a
             href="https://github.com/lyimoexiao/komari-theme-naive"
@@ -103,7 +103,7 @@ const blurClass = computed(() => {
             class="text-decoration-none transition-opacity hover:opacity-80"
           >
             <NText type="primary" class="text-sm font-medium">
-              Komari Naive
+              komari-theme-naive+
             </NText>
           </a>
           <NText :depth="3" class="text-xs font-mono ml-1">
