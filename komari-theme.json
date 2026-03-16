@@ -1,10 +1,10 @@
 {
   "name": "komari-theme-naive+",
   "short": "Naive_plus",
-  "description": "A customizable naive-ui theme for Komari",
+  "description": "A customizable naive-ui theme for Komari and set ui mode",
   "version": "0.0.1",
   "author": "iKeilo",
-  "url": "https://github.com/lyimoexiao/komari-theme-naive",
+  "url": "https://github.com/iKeilo/komari-theme-naive-plus",
   "preview": "preview.png",
   "configuration": {
     "type": "managed",
