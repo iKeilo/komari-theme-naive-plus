@@ -1,5 +1,5 @@
-<h3 align="center"> Komari Naive </h3>
-<p align="center">基于 Vue 3 + Vite + Naive UI 构建的 Komari Monitor 主题
+<h3 align="center"> Komari Naive Plus</h3>
+<p align="center">基于 Vue 3 + Vite + Naive UI 由Chat GPT构建的 Komari Monitor 主题
 </p>
 <a href="https://github.com/iKeilo/komari-theme-naive-plus">
 <img src="docs/preview.png" alt="Komari Theme Naive" />
