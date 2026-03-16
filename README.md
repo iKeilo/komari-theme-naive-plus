@@ -1,13 +1,14 @@
 <h3 align="center"> Komari Naive </h3>
 <p align="center">基于 Vue 3 + Vite + Naive UI 构建的 Komari Monitor 主题
 </p>
-<a href="https://github.com/lyimoexiao/komari-theme-naive">
+<a href="https://github.com/iKeilo/komari-theme-naive-plus">
 <img src="docs/preview.png" alt="Komari Theme Naive" />
 </a>
-
+<p align="center">使用ChatGPT 4.5编程
+</p>
 ## 使用
 
-1. 从 [Release 页面](https://github.com/lyimoexiao/komari-theme-naive/releases) 下载最新的 `komari-theme-naive-build-*.zip` 文件
+1. 从 [Release 页面](https://github.com/iKeilo/komari-theme-naive-plus/releases/download/main/komari-theme-naive-plus-build-b2d4023.zip) 下载最新的 `komari-theme-naive-build-*.zip` 文件
 2. 登录 Komari Monitor 后，点击 `设置`，选择 `主题管理` 选项卡
 3. 点击 `上传主题` 按钮，选择下载的 `komari-theme-naive-build-*.zip` 文件
 4. 刷新页面，即可看到新的主题
@@ -61,6 +62,7 @@ pnpm preview
 - [Vite](https://vitejs.dev/)
 - [Naive UI](https://www.naiveui.com/)
 - [UnoCSS](https://unocss.dev/)
+- [komari-theme-naive]([https://unocss.dev/](https://github.com/lyimoexiao/komari-theme-naive))
 
 ## License
 
